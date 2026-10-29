@@ -1,0 +1,230 @@
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <fstream>
+#include <iomanip>
+using namespace std;
+using namespace chrono;
+
+struct Result {
+    int profit;
+    int buyDay;
+    int sellDay;
+};
+
+
+Result linearScan(const vector<int>& prices) {
+    int minPrice = prices[0];
+    int minDay = 0;
+    Result best{ 0, 0, 0 };
+
+    for (int i = 1; i < (int)prices.size(); i++) {
+        int currentProfit = prices[i] - minPrice;
+
+        if (currentProfit > best.profit) {
+            best = { currentProfit, minDay, i };
+        }
+
+        if (prices[i] < minPrice) {
+            minPrice = prices[i];
+            minDay = i;
+        }
+    }
+
+    return best;
+}
+
+
+Result divideAndConquer(
+    const vector<int>& prices,
+    int left,
+    int right
+) {
+    if (left >= right) {
+        return { 0, left, left };
+    }
+
+    int mid = left + (right - left) / 2;
+
+    Result leftResult =
+        divideAndConquer(prices, left, mid);
+
+    Result rightResult =
+        divideAndConquer(prices, mid + 1, right);
+
+   
+    int minDay = left;
+
+    for (int i = left + 1; i <= mid; i++) {
+        if (prices[i] < prices[minDay]) {
+            minDay = i;
+        }
+    }
+
+  
+    int maxDay = mid + 1;
+
+    for (int i = mid + 2; i <= right; i++) {
+        if (prices[i] > prices[maxDay]) {
+            maxDay = i;
+        }
+    }
+
+   
+    Result crossResult{
+        prices[maxDay] - prices[minDay],
+        minDay,
+        maxDay
+    };
+
+    Result best = leftResult;
+
+    if (rightResult.profit > best.profit) {
+        best = rightResult;
+    }
+
+    if (crossResult.profit > best.profit) {
+        best = crossResult;
+    }
+
+    return best;
+}
+
+
+void displayResult(
+    const string& method,
+    Result result,
+    const vector<int>& prices,
+    double timeMs
+) {
+    cout << method << "\n";
+    cout << "Maximum Profit: "
+         << result.profit << "\n";
+
+    if (result.profit > 0) {
+        cout << "Buy Day: "
+             << result.buyDay + 1
+             << ", Price: "
+             << prices[result.buyDay] << "\n";
+
+        cout << "Sell Day: "
+             << result.sellDay + 1
+             << ", Price: "
+             << prices[result.sellDay] << "\n";
+    }
+    else {
+        cout << "No profitable transaction available.\n";
+    }
+
+    cout << "Execution Time: "
+         << fixed << setprecision(6)
+         << timeMs << " ms\n\n";
+}
+
+int main() {
+    cout << "================================\n";
+    cout << "       MAX PROFIT FINDER\n";
+    cout << "================================\n\n";
+
+    int n;
+
+    cout << "Enter number of days (at least 2): ";
+    cin >> n;
+
+    if (!cin || n < 2) {
+        cout << "Please enter at least 2 days.\n";
+        return 1;
+    }
+
+    vector<int> prices(n);
+
+    cout << "\nEnter stock prices:\n";
+
+    for (int i = 0; i < n; i++) {
+        cout << "Day " << i + 1 << ": ";
+        cin >> prices[i];
+
+        if (!cin || prices[i] < 0) {
+            cout << "Invalid price.\n";
+            return 1;
+        }
+    }
+
+    cout << "\nStock Prices: ";
+
+    for (int price : prices) {
+        cout << price << " ";
+    }
+
+    cout << "\n\n";
+
+    auto start1 = high_resolution_clock::now();
+
+    Result linearResult = linearScan(prices);
+
+    auto end1 = high_resolution_clock::now();
+
+    double linearTime =
+        duration<double, milli>(end1 - start1).count();
+
+  
+    auto start2 = high_resolution_clock::now();
+
+    Result dcResult =
+        divideAndConquer(prices, 0, n - 1);
+
+    auto end2 = high_resolution_clock::now();
+
+    double dcTime =
+        duration<double, milli>(end2 - start2).count();
+
+
+    displayResult(
+        "1. Linear Scan - O(n)",
+        linearResult,
+        prices,
+        linearTime
+    );
+displayResult(
+        "2. Divide and Conquer - O(n log n)",
+        dcResult,
+        prices,
+        dcTime
+    );
+
+   
+    if (linearResult.profit == dcResult.profit) {
+        cout << "Verification: Both methods agree.\n";
+    }
+    else {
+        cout << "Verification failed.\n";
+    }
+
+  
+    ofstream file("max_profit_results.csv");
+
+    if (file.is_open()) {
+        file << "Method,Input Size,Maximum Profit,Execution Time (ms)\n";
+
+        file << "Linear Scan,"
+             << n << ","
+             << linearResult.profit << ","
+             << setprecision(10)
+             << linearTime << "\n";
+
+        file << "Divide and Conquer,"
+             << n << ","
+             << dcResult.profit << ","
+             << setprecision(10)
+             << dcTime << "\n";
+
+        file.close();
+
+        cout << "\nResults saved to max_profit_results.csv\n";
+    }
+    else {
+        cout << "\nCould not create the CSV file.\n";
+    }
+
+    return 0;
+}
